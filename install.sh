@@ -14,6 +14,9 @@ echo "Creating database directory..."
 mkdir -p attendence-system/database
 touch attendence-system/database/attendance.db
 
+echo "Installing system dependencies..."
+sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
+
 echo "Creating .env file..."
 cd dashboard
 if [ ! -f .env ]; then
