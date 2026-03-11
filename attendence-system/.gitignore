@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+database/
+photos/
+registered_faces/

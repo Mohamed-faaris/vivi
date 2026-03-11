@@ -12,6 +12,22 @@ def get_face_encoding(image):
     return None
 
 
+def detect_face(image):
+    face_recognition.face_locations(image)
+    locs = face_recognition.face_locations(image)
+    encodings = face_recognition.face_encodings(image, locs)
+
+    if len(encodings) > 0:
+        return locs[0], encodings[0]
+
+    return None, None
+
+
+def crop_face(image, face_location):
+    top, right, bottom, left = face_location
+    return image[top:bottom, left:right]
+
+
 def encode_to_blob(encoding):
     return pickle.dumps(encoding)
 

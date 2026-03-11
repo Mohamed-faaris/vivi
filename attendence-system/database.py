@@ -14,7 +14,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         roll TEXT,
-        encoding BLOB
+        encoding BLOB,
+        photo TEXT
     )
     """)
 
