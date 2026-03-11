@@ -5,7 +5,7 @@ import os
 from PIL import Image
 import face_recognition
 
-from database import init_db, get_connection
+from database import init_db, get_connection, get_user_force_out
 from face_utils import get_face_encoding, encode_to_blob, decode_blob, compare_faces, detect_face, crop_face
 from attendance import mark_attendance
 
@@ -74,8 +74,8 @@ if menu == "Register User":
             cursor = conn.cursor()
 
             cursor.execute(
-                "INSERT INTO users(name,roll,encoding,photo) VALUES(?,?,?,?)",
-                (name, roll, encode_to_blob(encoding), photo_path)
+                "INSERT INTO users(name,roll,encoding,photo,force_out) VALUES(?,?,?,?,?)",
+                (name, roll, encode_to_blob(encoding), photo_path, 0)
             )
 
             conn.commit()
@@ -207,19 +207,30 @@ elif menu == "Real-time Attendance":
                 face_center = (left + right) // 2
                 
                 if face_center < center_x:
-                    status_label = "IN"
-                    box_color = (0, 255, 0)
+                    default_status = "IN"
+                    default_color = (0, 255, 0)
                 else:
-                    status_label = "OUT"
-                    box_color = (0, 0, 255)
+                    default_status = "OUT"
+                    default_color = (0, 0, 255)
                 
-                cv2.rectangle(frame, (left, top), (right, bottom), box_color, 2)
+                cv2.rectangle(frame, (left, top), (right, bottom), default_color, 2)
                 
                 match = compare_faces(known_encodings, face_enc)
                 
                 if match is not None:
                     name = names[match]
                     user_id = user_ids[match]
+                    
+                    force_out = get_user_force_out(user_id)
+                    
+                    if force_out == 1:
+                        status_label = "OUT"
+                        box_color = (0, 0, 255)
+                    else:
+                        status_label = default_status
+                        box_color = default_color
+                    
+                    cv2.rectangle(frame, (left, top), (right, bottom), box_color, 2)
                     
                     cv2.putText(frame, f"{name} ({status_label})", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, box_color, 2)
                     
@@ -232,7 +243,7 @@ elif menu == "Real-time Attendance":
                         if status:
                             st.toast(f"{name} - {status} at {time}", icon="✅")
                 else:
-                    cv2.putText(frame, f"Unknown ({status_label})", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, box_color, 2)
+                    cv2.putText(frame, f"Unknown ({default_status})", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, default_color, 2)
             
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             FRAME_WINDOW.image(frame)
