@@ -27,6 +27,8 @@ if st.sidebar.button("Register User"):
     st.session_state.menu = "Register User"
 if st.sidebar.button("View Registered Users"):
     st.session_state.menu = "View Registered Users"
+if st.sidebar.button("User List"):
+    st.session_state.menu = "User List"
 if st.sidebar.button("Take Attendance"):
     st.session_state.menu = "Take Attendance"
 if st.sidebar.button("Real-time Attendance"):
@@ -118,6 +120,51 @@ elif menu == "View Registered Users":
                     st.image(user[2], caption=f"{user[0]} ({user[1]})", use_container_width=True)
                 else:
                     st.warning(f"{user[0]} ({user[1]}) - No photo")
+
+elif menu == "User List":
+    st.header("User List with States")
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id, name, roll, photo, force_out FROM users")
+    users = cursor.fetchall()
+    
+    conn.close()
+    
+    if not users:
+        st.info("No registered users")
+    else:
+        for user in users:
+            col1, col2, col3, col4 = st.columns([1, 2, 1, 1])
+            
+            with col1:
+                if user[3] and os.path.exists(user[3]):
+                    st.image(user[3], width=60)
+                else:
+                    st.write("📷")
+            
+            with col2:
+                st.write(f"**{user[1]}**")
+                st.caption(user[2])
+            
+            with col3:
+                if user[4] == 1:
+                    st.error("Force OUT")
+                else:
+                    st.success("Auto")
+            
+            with col4:
+                new_state = st.toggle("Force OUT", value=(user[4] == 1), key=f"toggle_{user[0]}")
+                if new_state != bool(user[4]):
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE users SET force_out = ? WHERE id = ?", (1 if new_state else 0, user[0]))
+                    conn.commit()
+                    conn.close()
+                    st.rerun()
+            
+            st.divider()
 
 elif menu == "Take Attendance":
     st.header("Scan Face")
