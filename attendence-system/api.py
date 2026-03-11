@@ -37,7 +37,7 @@ async def home(request: Request):
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Attendance Control Panel</title>
+        <title>Connection Control Panel</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
@@ -52,22 +52,15 @@ async def home(request: Request):
             .user-status {{ padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }}
             .status-on {{ background: #d4edda; color: #155724; }}
             .status-off {{ background: #f8d7da; color: #721c24; }}
-            .toggle-container {{ display: flex; align-items: center; gap: 10px; }}
-            .toggle {{ position: relative; width: 50px; height: 26px; }}
-            .toggle input {{ opacity: 0; width: 0; height: 0; }}
-            .slider {{ position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #dc3545; transition: 0.3s; border-radius: 26px; }}
-            .slider:before {{ position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%; }}
-            input:checked + .slider {{ background-color: #28a745; }}
-            input:checked + .slider:before {{ transform: translateX(24px); }}
             .mark-out-btn {{ padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s; }}
-            .mark-out-btn:hover {{ background: #c82333; }}
-            .mark-out-btn:disabled {{ background: #ccc; cursor: not-allowed; }}
+            .mark-out-btn.connect {{ background: #28a745; }}
+            .mark-out-btn.connect:hover {{ background: #218838; }}
             .no-users {{ text-align: center; color: #666; padding: 40px; }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>Attendance Control Panel</h1>
+            <h1>Connection Control Panel</h1>
     """
 
     if not users_data:
@@ -77,9 +70,9 @@ async def home(request: Request):
             photo_path = user["photo"] if user["photo"] and os.path.exists(user["photo"]) else None
             photo_url = f"/photos/{os.path.basename(photo_path)}" if photo_path else "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%23ddd'/%3E%3Ctext x='40' y='45' text-anchor='middle' fill='%23999' font-size='30'%3E%3F%3C/text%3E%3C/svg%3E"
             
-            toggle_checked = "checked" if user["force_out"] == 0 else ""
-            status_class = "status-on" if user["force_out"] == 0 else "status-off"
-            status_text = "Auto (IN/OUT)" if user["force_out"] == 0 else "Force OUT"
+            connection_active = user["force_out"] == 0
+            status_class = "status-on" if connection_active else "status-off"
+            status_text = "Connected" if connection_active else "Disconnected"
             
             html += f"""
             <div class="user-card">
@@ -89,13 +82,7 @@ async def home(request: Request):
                     <div class="user-roll">{user['roll']}</div>
                     <span class="user-status {status_class}">{status_text}</span>
                 </div>
-                <div class="toggle-container">
-                    <label class="toggle">
-                        <input type="checkbox" {toggle_checked} onchange="toggleForceOut({user['id']}, this.checked)">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <button class="mark-out-btn" id="btn-{user['id']}" onclick="markOut({user['id']})" {'disabled' if user['force_out'] == 0 else ''}>Mark OUT</button>
+                <button class="mark-out-btn {'connect' if connection_active else ''}" onclick="toggleConnection({user['id']}, {str(connection_active).lower()})">{ 'Disconnect' if connection_active else 'Connect' }</button>
             </div>
             """
 
@@ -103,7 +90,7 @@ async def home(request: Request):
         </div>
         
         <div class="container" style="margin-top: 40px;">
-            <h2>Toggle History</h2>
+            <h2>Connection History</h2>
             <table class="log-table">
                 <thead>
                     <tr>
@@ -117,7 +104,7 @@ async def home(request: Request):
 
     toggle_logs = get_toggle_log(20)
     for log in toggle_logs:
-        status_text = "Auto (IN/OUT)" if log[2] == 0 else "Force OUT"
+        status_text = "Connected" if log[2] == 0 else "Disconnected"
         status_class = "status-on" if log[2] == 0 else "status-off"
         html += f"""
             <tr>
@@ -140,11 +127,11 @@ async def home(request: Request):
         </style>
         
         <script>
-            async function toggleForceOut(userId, enabled) {
+            async function toggleConnection(userId, currentlyConnected) {
                 await fetch(`/toggle/${userId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({force_out: enabled ? 0 : 1})
+                    body: JSON.stringify({force_out: currentlyConnected ? 1 : 0})
                 });
                 location.reload();
             }

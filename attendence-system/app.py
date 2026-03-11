@@ -122,7 +122,7 @@ elif menu == "View Registered Users":
                     st.warning(f"{user[0]} ({user[1]}) - No photo")
 
 elif menu == "User List":
-    st.header("User List with States")
+    st.header("User List with Connection Status")
     
     conn = get_connection()
     cursor = conn.cursor()
@@ -130,12 +130,18 @@ elif menu == "User List":
     cursor.execute("SELECT id, name, roll, photo, force_out FROM users")
     users = cursor.fetchall()
     
-    conn.close()
-    
     if not users:
         st.info("No registered users")
     else:
         for user in users:
+            cursor.execute("""
+                SELECT status FROM attendance 
+                WHERE user_id = ? 
+                ORDER BY id DESC LIMIT 1
+            """, (user[0],))
+            last_attendance = cursor.fetchone()
+            current_status = last_attendance[0] if last_attendance else None
+            
             col1, col2, col3, col4 = st.columns([1, 2, 1, 1])
             
             with col1:
@@ -149,22 +155,22 @@ elif menu == "User List":
                 st.caption(user[2])
             
             with col3:
-                if user[4] == 1:
-                    st.error("Force OUT")
+                if user[4] == 0:
+                    st.success("Active")
                 else:
-                    st.success("Auto")
+                    st.error("Inactive")
             
             with col4:
-                new_state = st.toggle("Force OUT", value=(user[4] == 1), key=f"toggle_{user[0]}")
-                if new_state != bool(user[4]):
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE users SET force_out = ? WHERE id = ?", (1 if new_state else 0, user[0]))
-                    conn.commit()
-                    conn.close()
-                    st.rerun()
+                if current_status == "IN":
+                    st.info("IN")
+                elif current_status == "OUT":
+                    st.warning("OUT")
+                else:
+                    st.caption("-")
             
             st.divider()
+    
+    conn.close()
 
 elif menu == "Take Attendance":
     st.header("Scan Face")
