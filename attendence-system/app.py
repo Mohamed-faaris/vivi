@@ -42,27 +42,41 @@ if menu == "Register User":
     name = st.text_input("Name")
     roll = st.text_input("Roll Number")
 
-    picture = st.camera_input("Take Photo")
+    tab1, tab2 = st.tabs(["Camera", "Upload Photo"])
+    
+    picture = None
+    img = None
+    rgb = None
+    face_location = None
+    encoding = None
+    
+    with tab1:
+        picture = st.camera_input("Take Photo", key="camera")
+    
+    with tab2:
+        uploaded_file = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
+        if uploaded_file is not None:
+            bytes_data = uploaded_file.getvalue()
+            np_img = np.frombuffer(bytes_data, np.uint8)
+            img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
 
-    if picture is not None:
-        bytes_data = picture.getvalue()
-        np_img = np.frombuffer(bytes_data, np.uint8)
-        img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
-
+    if img is not None:
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
         face_location, encoding = detect_face(rgb)
 
         if encoding is not None:
             top, right, bottom, left = face_location
-            cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), 2)
-            st.image(img, caption="Face Detected", channels="BGR")
+            img_with_box = img.copy()
+            cv2.rectangle(img_with_box, (left, top), (right, bottom), (0, 255, 0), 2)
+            st.image(img_with_box, caption="Face Detected", channels="BGR")
 
     if st.button("Register"):
-        if picture is None:
-            st.error("Take photo first")
+        if img is None:
+            st.error("Take photo or upload image first")
         elif encoding is None:
             st.error("Face not detected")
+        elif not name or not roll:
+            st.error("Enter name and roll number")
         else:
             cropped_face = crop_face(rgb, face_location)
 

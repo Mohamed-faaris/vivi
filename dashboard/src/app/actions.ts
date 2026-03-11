@@ -26,9 +26,11 @@ export type DashboardStats = {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const today = new Date().toISOString().split("T")[0];
+  console.log("[Dashboard] Getting stats for date:", today);
 
   const totalUsersResult = await db.select({ count: sql`count(*)`.as("count") }).from(users);
   const totalUsers = Number(totalUsersResult[0]?.count) ?? 0;
+  console.log("[Dashboard] Total users:", totalUsers);
 
   const checkedInResult = await db
     .select({ count: sql`count(*)`.as("count") })
@@ -40,15 +42,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     .from(attendance)
     .where(sql`${attendance.status} = 'OUT' AND ${attendance.timestamp} LIKE ${today + "%"}`);
 
-  return {
+  const result = {
     totalUsers,
     checkedInToday: Number(checkedInResult[0]?.count) ?? 0,
     checkedOutToday: Number(checkedOutResult[0]?.count) ?? 0,
   };
+  
+  console.log("[Dashboard] Stats result:", result);
+  return result;
 }
 
 export async function getTodayAttendance(): Promise<AttendanceWithUser[]> {
   const today = new Date().toISOString().split("T")[0];
+  console.log("[Dashboard] Getting attendance for date:", today);
 
   const results = await db
     .select({
@@ -67,7 +73,9 @@ export async function getTodayAttendance(): Promise<AttendanceWithUser[]> {
     .where(sql`${attendance.timestamp} LIKE ${today + "%"}`)
     .orderBy(desc(attendance.timestamp));
 
-  return results.map((row) => ({
+  console.log("[Dashboard] Raw attendance records:", results.length);
+
+  const mapped = results.map((row) => ({
     id: row.id,
     userId: row.userId,
     timestamp: row.timestamp,
@@ -82,4 +90,7 @@ export async function getTodayAttendance(): Promise<AttendanceWithUser[]> {
         }
       : null,
   }));
+
+  console.log("[Dashboard] Mapped attendance:", mapped);
+  return mapped;
 }
