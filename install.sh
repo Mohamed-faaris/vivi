@@ -10,6 +10,17 @@ if ! command -v bun &> /dev/null; then
     export PATH="$BUN_INSTALL/bin:$PATH"
 fi
 
+echo "Creating database directory..."
+mkdir -p attendence-system/database
+touch attendence-system/database/attendance.db
+
+echo "Creating .env file..."
+cd dashboard
+if [ ! -f .env ]; then
+    cp .env.example .env
+fi
+cd ..
+
 echo "Creating Python virtual environment..."
 cd attendence-system
 python3 -m venv .venv
