@@ -18,10 +18,23 @@ init_db()
 
 st.title("Face Attendance System")
 
-menu = st.sidebar.selectbox(
-    "Menu",
-    ["Register User", "View Registered Users", "Take Attendance", "Real-time Attendance", "View Entries"]
-)
+if "menu" not in st.session_state:
+    st.session_state.menu = "Register User"
+
+st.sidebar.markdown("### Navigation")
+
+if st.sidebar.button("Register User"):
+    st.session_state.menu = "Register User"
+if st.sidebar.button("View Registered Users"):
+    st.session_state.menu = "View Registered Users"
+if st.sidebar.button("Take Attendance"):
+    st.session_state.menu = "Take Attendance"
+if st.sidebar.button("Real-time Attendance"):
+    st.session_state.menu = "Real-time Attendance"
+if st.sidebar.button("View Entries"):
+    st.session_state.menu = "View Entries"
+
+menu = st.session_state.menu
 
 if menu == "Register User":
     st.header("Register New User")
