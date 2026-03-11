@@ -20,7 +20,7 @@ st.title("Face Attendance System")
 
 menu = st.sidebar.selectbox(
     "Menu",
-    ["Register User", "View Registered Users", "Take Attendance", "Real-time Attendance"]
+    ["Register User", "View Registered Users", "Take Attendance", "Real-time Attendance", "View Entries"]
 )
 
 if menu == "Register User":
@@ -31,44 +31,44 @@ if menu == "Register User":
 
     picture = st.camera_input("Take Photo")
 
+    if picture is not None:
+        bytes_data = picture.getvalue()
+        np_img = np.frombuffer(bytes_data, np.uint8)
+        img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+
+        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        face_location, encoding = detect_face(rgb)
+
+        if encoding is not None:
+            top, right, bottom, left = face_location
+            cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), 2)
+            st.image(img, caption="Face Detected", channels="BGR")
+
     if st.button("Register"):
         if picture is None:
             st.error("Take photo first")
+        elif encoding is None:
+            st.error("Face not detected")
         else:
-            bytes_data = picture.getvalue()
-            np_img = np.frombuffer(bytes_data, np.uint8)
-            img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+            cropped_face = crop_face(rgb, face_location)
 
-            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            photo_filename = f"{roll}.jpg"
+            photo_path = os.path.join(REGISTERED_FACES_DIR, photo_filename)
+            cv2.imwrite(photo_path, cv2.cvtColor(cropped_face, cv2.COLOR_RGB2BGR))
 
-            face_location, encoding = detect_face(rgb)
+            conn = get_connection()
+            cursor = conn.cursor()
 
-            if encoding is None:
-                st.error("Face not detected")
-            else:
-                top, right, bottom, left = face_location
-                cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), 2)
+            cursor.execute(
+                "INSERT INTO users(name,roll,encoding,photo) VALUES(?,?,?,?)",
+                (name, roll, encode_to_blob(encoding), photo_path)
+            )
 
-                st.image(img, caption="Face Detected", channels="BGR")
+            conn.commit()
+            conn.close()
 
-                cropped_face = crop_face(rgb, face_location)
-
-                photo_filename = f"{roll}.jpg"
-                photo_path = os.path.join(REGISTERED_FACES_DIR, photo_filename)
-                cv2.imwrite(photo_path, cv2.cvtColor(cropped_face, cv2.COLOR_RGB2BGR))
-
-                conn = get_connection()
-                cursor = conn.cursor()
-
-                cursor.execute(
-                    "INSERT INTO users(name,roll,encoding,photo) VALUES(?,?,?,?)",
-                    (name, roll, encode_to_blob(encoding), photo_path)
-                )
-
-                conn.commit()
-                conn.close()
-
-                st.success("User Registered")
+            st.success("User Registered")
 
 elif menu == "View Registered Users":
     st.header("Registered Users")
@@ -180,12 +180,27 @@ elif menu == "Real-time Attendance":
             if not ret:
                 break
             
+            h, w = frame.shape[:2]
+            center_x = w // 2
+            cv2.line(frame, (center_x, 0), (center_x, h), (255, 255, 0), 2)
+            cv2.putText(frame, "IN", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(frame, "OUT", (w - 80, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             face_locs = face_recognition.face_locations(rgb)
             face_encodings = face_recognition.face_encodings(rgb, face_locs)
             
             for (top, right, bottom, left), face_enc in zip(face_locs, face_encodings):
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+                face_center = (left + right) // 2
+                
+                if face_center < center_x:
+                    status_label = "IN"
+                    box_color = (0, 255, 0)
+                else:
+                    status_label = "OUT"
+                    box_color = (0, 0, 255)
+                
+                cv2.rectangle(frame, (left, top), (right, bottom), box_color, 2)
                 
                 match = compare_faces(known_encodings, face_enc)
                 
@@ -193,19 +208,56 @@ elif menu == "Real-time Attendance":
                     name = names[match]
                     user_id = user_ids[match]
                     
-                    cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    cv2.putText(frame, f"{name} ({status_label})", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, box_color, 2)
                     
                     if user_id not in attended_today:
                         attended_today.add(user_id)
                         cropped_face = crop_face(rgb, (top, right, bottom, left))
                         photo_path = os.path.join(PHOTOS_DIR, f"{name}_rt.jpg")
                         cv2.imwrite(photo_path, cv2.cvtColor(cropped_face, cv2.COLOR_RGB2BGR))
-                        status, time = mark_attendance(user_id, photo_path)
-                        st.toast(f"{name} - {status} at {time}", icon="✅")
+                        status, time = mark_attendance(user_id, photo_path, status_label)
+                        if status:
+                            st.toast(f"{name} - {status} at {time}", icon="✅")
                 else:
-                    cv2.putText(frame, "Unknown", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                    cv2.putText(frame, f"Unknown ({status_label})", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, box_color, 2)
             
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             FRAME_WINDOW.image(frame)
             
         cap.release()
+
+elif menu == "View Entries":
+    st.header("Attendance Entries")
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+    SELECT a.id, u.name, u.roll, a.timestamp, a.status, a.photo
+    FROM attendance a
+    JOIN users u ON a.user_id = u.id
+    ORDER BY a.timestamp DESC
+    """)
+    entries = cursor.fetchall()
+    
+    conn.close()
+    
+    if not entries:
+        st.info("No attendance entries")
+    else:
+        for entry in entries:
+            col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
+            with col1:
+                st.write(f"**{entry[1]}**")
+                st.caption(entry[2])
+            with col2:
+                st.write(entry[3])
+            with col3:
+                if entry[4] == "IN":
+                    st.success("IN")
+                else:
+                    st.error("OUT")
+            with col4:
+                if entry[5] and os.path.exists(entry[5]):
+                    st.image(entry[5], width=50)
+            st.divider()

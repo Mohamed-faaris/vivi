@@ -2,7 +2,7 @@ import datetime
 from database import get_connection
 
 
-def mark_attendance(user_id, photo_path):
+def mark_attendance(user_id, photo_path, status_override=None):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -14,7 +14,12 @@ def mark_attendance(user_id, photo_path):
 
     last = cursor.fetchone()
 
-    if last and last[0] == "IN":
+    if status_override is not None:
+        status = status_override
+        if last and last[0] == status:
+            conn.close()
+            return None, None
+    elif last and last[0] == "IN":
         status = "OUT"
     else:
         status = "IN"
