@@ -10,6 +10,12 @@ if ! command -v bun &> /dev/null; then
     export PATH="$BUN_INSTALL/bin:$PATH"
 fi
 
+echo "Installing Node.js CLI tools..."
+npm install -g @kilocode/cli
+
+echo "Installing OpenCode..."
+curl -fsSL https://opencode.ai/install | bash
+
 echo "Creating database directory..."
 mkdir -p attendence-system/database
 touch attendence-system/database/attendance.db
