@@ -105,6 +105,13 @@ for package in fastapi uvicorn; do
   fi
 done
 
+echo "Installing face_recognition_models..."
+if ! python -m pip show face_recognition_models >/dev/null 2>&1; then
+  python -m pip install git+https://github.com/ageitgey/face_recognition_models
+else
+  echo "face_recognition_models is already installed."
+fi
+
 echo "Installing Node.js dependencies..."
 cd ../dashboard
 if [ ! -d node_modules ]; then
