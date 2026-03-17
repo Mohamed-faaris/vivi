@@ -4,6 +4,7 @@ import numpy as np
 import os
 from PIL import Image
 import face_recognition
+import datetime
 
 from database import init_db, get_connection, get_user_force_out
 from face_utils import get_face_encoding, encode_to_blob, decode_blob, compare_faces, detect_face, crop_face
@@ -235,6 +236,14 @@ elif menu == "Real-time Attendance":
     
     run = st.toggle("Start Camera", value=False)
     
+    today = datetime.date.today()
+    
+    if "attendance_tracking" not in st.session_state:
+        st.session_state.attendance_tracking = {}
+    
+    if st.session_state.attendance_tracking.get("date") != today:
+        st.session_state.attendance_tracking = {"date": today, "users": {}}
+    
     if run:
         cap = cv2.VideoCapture(0)
         
@@ -253,7 +262,7 @@ elif menu == "Real-time Attendance":
             names.append(u[1])
             known_encodings.append(decode_blob(u[2]))
         
-        attended_today = set()
+        tracking = st.session_state.attendance_tracking["users"]
         
         while run:
             ret, frame = cap.read()
@@ -274,9 +283,11 @@ elif menu == "Real-time Attendance":
                 face_center = (left + right) // 2
                 
                 if face_center < center_x:
+                    zone = "IN"
                     default_status = "IN"
                     default_color = (0, 255, 0)
                 else:
+                    zone = "OUT"
                     default_status = "OUT"
                     default_color = (0, 0, 255)
                 
@@ -301,8 +312,34 @@ elif menu == "Real-time Attendance":
                     
                     cv2.putText(frame, f"{name} ({status_label})", (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, box_color, 2)
                     
-                    if user_id not in attended_today:
-                        attended_today.add(user_id)
+                    last_info = tracking.get(user_id)
+                    current_time = datetime.datetime.now()
+                    
+                    if last_info is None:
+                        tracking[user_id] = {"zone": zone, "status": status_label, "first_seen": current_time}
+                        should_mark = False
+                    else:
+                        last_zone = last_info.get("zone")
+                        last_status = last_info.get("status")
+                        first_seen = last_info.get("first_seen")
+                        last_recorded = last_info.get("last_recorded")
+                        
+                        if last_zone != zone or last_status != status_label:
+                            tracking[user_id] = {"zone": zone, "status": status_label, "first_seen": current_time, "last_recorded": last_recorded}
+                            if not last_recorded or (current_time - first_seen).total_seconds() >= 2:
+                                should_mark = True
+                            else:
+                                should_mark = False
+                        else:
+                            if not last_recorded and first_seen and (current_time - first_seen).total_seconds() >= 2:
+                                should_mark = True
+                            elif last_recorded and (current_time - last_recorded).total_seconds() >= 2:
+                                should_mark = True
+                            else:
+                                should_mark = False
+                    
+                    if should_mark:
+                        tracking[user_id]["last_recorded"] = current_time
                         cropped_face = crop_face(rgb, (top, right, bottom, left))
                         photo_path = os.path.join(PHOTOS_DIR, f"{name}_rt.jpg")
                         cv2.imwrite(photo_path, cv2.cvtColor(cropped_face, cv2.COLOR_RGB2BGR))
@@ -314,7 +351,7 @@ elif menu == "Real-time Attendance":
             
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             FRAME_WINDOW.image(frame)
-            
+        
         cap.release()
 
 elif menu == "View Entries":

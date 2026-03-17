@@ -13,19 +13,19 @@ python api.py &
 API_PID=$!
 
 echo "Starting Streamlit on port 8501..."
-streamlit run app.py --server.port 8501 &
+streamlit run app.py --server.port 8501 --server.address 0.0.0.0 &
 STREAMLIT_PID=$!
 
 echo "Starting Next.js dashboard on port 3000..."
 cd ../dashboard
-bun run dev &
+bun run dev --hostname 0.0.0.0 &
 NEXT_PID=$!
 
 echo ""
 echo "All services started:"
-echo "- FastAPI Control Panel: http://localhost:8080"
-echo "- Streamlit App: http://localhost:8501"
-echo "- Next.js Dashboard: http://localhost:3000"
+echo "- FastAPI Control Panel: http://<your-ip>:8080"
+echo "- Streamlit App: http://<your-ip>:8501"
+echo "- Next.js Dashboard: http://<your-ip>:3000"
 echo ""
 echo "Press Ctrl+C to stop all services"
 
